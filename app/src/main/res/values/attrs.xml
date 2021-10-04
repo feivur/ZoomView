@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="zoomview">
+        <attr name="minimap_enabled" format="boolean" />
+        <attr name="minimap_size" format="dimension" />
+        <attr name="minimap_pos_x" format="dimension" />
+        <attr name="minimap_pos_y" format="dimension" />
+        <attr name="minimap_color_thumb" format="color" />
+        <attr name="minimap_color_background" format="color" />
+        <attr name="minimap_color_stroke" format="color" />
+        <attr name="minimap_caption" format="string" />
+        <attr name="minimap_caption_color" format="color" />
+        <attr name="minimap_caption_size" format="dimension" />
+        <attr name="minimap_gravity">
+            <flag name="right" value="0x01" />
+            <flag name="bottom" value="0x02" />
+            <flag name="left" value="0x04" />
+        </attr>
+    </declare-styleable>
+
+</resources>
