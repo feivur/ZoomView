@@ -1,21 +1,24 @@
 package com.axxonsoft.zoomview
 
+import android.animation.TypeEvaluator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import timber.log.Timber
-import kotlin.math.min
 
 /**
- * Zooming view.
+ * Zooming view
+ * Created by Feivur on 05.10.2021.
+ * inspired by https://github.com/Polidea/android-zoom-view
  */
-class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
-    GestureDetector.OnGestureListener,
-    GestureDetector.OnDoubleTapListener {
+class ZoomView : FrameLayout {
 
     // zooming
     var zoom = 1.0f
@@ -55,8 +58,8 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
 
     fun contentSize() = PointF(getView().width.toFloat(), getView().height.toFloat())
 
-    private val scaleDetector = ScaleGestureDetector(context, this)
-    private val gestureDetector = GestureDetector(context, this)
+    private val scaleDetector = ScaleGestureDetector(context, ScaleListener())
+    private val gestureDetector = GestureDetector(context, GestureListener())
 
     /**
      * Zooming view listener interface.
@@ -83,7 +86,6 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
 
     private fun init(context: Context, attrs: AttributeSet?) {
         Timber.i("init")
-        gestureDetector.setOnDoubleTapListener(this)
         if (attrs != null) {
             val a = context.obtainStyledAttributes(attrs, R.styleable.zoomview)
             if (a.hasValue(R.styleable.zoomview_minimap_enabled))
@@ -151,10 +153,19 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
         }
     }
 
-    fun zoomTo(zoom: Float, x: Float, y: Float) {
-        this.zoom = min(zoom, maxZoom)
-        zoomX = x
-        zoomY = y
+    /** Animated zoom to target value at focused place */
+    fun zoom(targetZoom: Float, focusX: Float, focusY: Float) {
+        val target = targetZoom.coerceIn(minZoom, maxZoom)
+        val animator = ValueAnimator.ofFloat(zoom, target)
+        animator.interpolator = AccelerateDecelerateInterpolator()
+        animator.addUpdateListener {
+            val current = it.animatedValue as Float
+            zoomAt(current, focusX, focusY)
+            fitChildInParent()
+            invalidate()
+        }
+        animator.start()
+
     }
 
     private fun getView() = getChildAt(0)
@@ -170,6 +181,17 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
             zoomY = (height / zoom - getView().height) / 2f
         else
             zoomY = zoomY.coerceIn(height / zoom - getView().height, 0f)
+    }
+
+    /** Zoom to target value at focused place */
+    private fun zoomAt(target: Float, focusX: Float, focusY: Float) {
+        // correct child offsets by zoom focus
+        val newZoom = target.coerceIn(minZoom, maxZoom)
+        val sfx = (-zoomX * zoom + focusX) / getView().width / zoom // scaled focus X
+        zoomX -= getView().width * sfx * (newZoom / zoom - 1) / zoom
+        val sfy = (-zoomY * zoom + focusY) / getView().height / zoom // scaled focus Y
+        zoomY -= getView().height * sfy * (newZoom / zoom - 1) / zoom
+        zoom = newZoom
     }
 
     private fun drawMiniMap(canvas: Canvas) {
@@ -237,9 +259,8 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
 
     override fun setEnabled(enabled: Boolean) {
         super.setEnabled(enabled)
-        if (!enabled) {
-            zoomTo(1f, 0.5f, 0.5f)
-        }
+        if (!enabled)
+            zoom(minZoom, width / 2f, height / 2f)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -278,82 +299,92 @@ class ZoomView : FrameLayout, ScaleGestureDetector.OnScaleGestureListener,
 
     //region GESTURES
 
-    override fun onScale(sgt: ScaleGestureDetector): Boolean {
-        zoom = (zoom * sgt.scaleFactor).coerceIn(minZoom, maxZoom)
-        // correct child offsets by zoom focus
-        val sfx = (-zoomX * zoom + sgt.focusX) / getView().width / zoom // scaled focus X
-        zoomX -= getView().width * sfx * (sgt.scaleFactor - 1) / zoom
-        val sfy = (-zoomY * zoom + sgt.focusY) / getView().height / zoom // scaled focus Y
-        zoomY -= getView().height * sfy * (sgt.scaleFactor - 1) / zoom
+    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
 
-        fitChildInParent()
+        override fun onSingleTapConfirmed(me: MotionEvent): Boolean {
+            // Timber.i("onSingleTapConfirmed at ${me.x}x${me.y}")
+            callOnClick()
+            return false
+        }
 
-        if (sgt.previousSpan != sgt.currentSpan)
-            listener?.onZooming(zoom, zoomX, zoomY)
+        override fun onDoubleTap(me: MotionEvent): Boolean {
+            // Timber.i("onDoubleTap at ${me.x}x${me.y}")
+            val targetZoom = if (zoom == minZoom) 3f else minZoom
+            zoom(targetZoom, me.x, me.y)
+            return false
+        }
 
-        Timber.i("onScale zoom=$zoom, sfx=${(sfx * 100).toInt()}%, sfy=${(sfy * 100).toInt()}%")
-        invalidate()
-        return true
+        override fun onDoubleTapEvent(me: MotionEvent): Boolean {
+            //Timber.i("onDoubleTapEvent at ${me.x}x${me.y}")
+            return false
+        }
+
+        override fun onScroll(me1: MotionEvent, me2: MotionEvent, dx: Float, dy: Float): Boolean {
+            zoomX -= dx / zoom
+            zoomY -= dy / zoom
+            fitChildInParent()
+            // Timber.i("onScroll: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
+            invalidate()
+            return true
+        }
+
+        override fun onFling(me1: MotionEvent, me2: MotionEvent, vx: Float, vy: Float): Boolean {
+            // Timber.i("onFling at ${vx}|${vy}")
+            val dempfer = zoom * 10
+            val start = PointF(zoomX, zoomY)
+            val end = PointF(zoomX + vx / dempfer, zoomY + vy / dempfer)
+            val animator = ValueAnimator.ofObject(EvaluatorOfPointF(), start, end)
+            animator.interpolator = DecelerateInterpolator()
+            animator.addUpdateListener {
+                val current = it.animatedValue as PointF
+                zoomX = current.x
+                zoomY = current.y
+                //Timber.i("onFling: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
+                fitChildInParent()
+                invalidate()
+            }
+            animator.start()
+            return false
+        }
     }
 
-    override fun onScaleBegin(sgt: ScaleGestureDetector?): Boolean {
-        Timber.i("onScaleBegin")
-        listener?.onZoomStarted()
-        return true
-    }
+    private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
 
-    override fun onScaleEnd(sgt: ScaleGestureDetector?) {
-        Timber.i("onScaleEnd")
-        listener?.onZoomEnded()
-    }
+        override fun onScale(sgt: ScaleGestureDetector): Boolean {
+            zoomAt(zoom * sgt.scaleFactor, sgt.focusX, sgt.focusY)
+            fitChildInParent()
 
-    override fun onDown(me: MotionEvent): Boolean {
-        Timber.i("onDown at ${me.x}x${me.y}")
-        return false
-    }
+            if (sgt.previousSpan != sgt.currentSpan)
+                listener?.onZooming(zoom, zoomX, zoomY)
 
-    override fun onShowPress(me: MotionEvent) {
-        Timber.i("onShowPress at ${me.x}x${me.y}")
-    }
+            //Timber.i("onScale zoom=$zoom, sfx=${(sfx * 100).toInt()}%, sfy=${(sfy * 100).toInt()}%")
+            invalidate()
+            return true
+        }
 
-    override fun onSingleTapUp(me: MotionEvent): Boolean {
-        Timber.i("onSingleTapUp at ${me.x}x${me.y}")
-        return false
-    }
+        override fun onScaleBegin(sgt: ScaleGestureDetector?): Boolean {
+            // Timber.i("onScaleBegin")
+            listener?.onZoomStarted()
+            return true
+        }
 
-    override fun onScroll(me1: MotionEvent, me2: MotionEvent, dx: Float, dy: Float): Boolean {
-        zoomX -= dx / zoom
-        zoomY -= dy / zoom
-        fitChildInParent()
-        Timber.i("onScroll: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
-        invalidate()
-        return true
+        override fun onScaleEnd(sgt: ScaleGestureDetector?) {
+            // Timber.i("onScaleEnd")
+            listener?.onZoomEnded()
+        }
     }
 
 
-    override fun onLongPress(me: MotionEvent) {
-        Timber.i("onLongPress at ${me.x}x${me.y}")
+    private class EvaluatorOfPointF : TypeEvaluator<PointF> {
+        override fun evaluate(fraction: Float, p1: PointF, p2: PointF): PointF {
+            //Timber.i("interpolator fraction = $fraction")
+            return PointF(
+                p1.x + (p2.x - p1.x) * fraction,
+                p1.y + (p2.y - p1.y) * fraction
+            )
+        }
     }
 
-    override fun onFling(me1: MotionEvent, me2: MotionEvent, vx: Float, vy: Float): Boolean {
-        Timber.i("onLongPress at ${vx}|${vy}")
-        return false
-    }
-
-    override fun onSingleTapConfirmed(me: MotionEvent): Boolean {
-        Timber.i("onSingleTapConfirmed at ${me.x}x${me.y}")
-        return false
-    }
-
-    override fun onDoubleTap(me: MotionEvent): Boolean {
-        Timber.i("onDoubleTap at ${me.x}x${me.y}")
-        return false
-    }
-
-    override fun onDoubleTapEvent(me: MotionEvent): Boolean {
-        Timber.i("onDoubleTapEvent at ${me.x}x${me.y}")
-        return false
-    }
 
     //endregion GESTURES
 
