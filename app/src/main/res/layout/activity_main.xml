@@ -3,12 +3,24 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    xmlns:zoomview="http://schemas.android.com/apk/res-auto"
     tools:context=".MainActivity">
 
     <com.axxonsoft.zoomview.ZoomView
         android:id="@+id/zoomView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        zoomview:max_zoom="5"
+        zoomview:min_zoom="1"
+        zoomview:minimap_caption_color="?android:attr/textColorSecondary"
+        zoomview:minimap_caption_size="12sp"
+        zoomview:minimap_color_background="?colorSurface"
+        zoomview:minimap_color_stroke="?colorOnSurface"
+        zoomview:minimap_color_thumb="?colorSurface"
+        zoomview:minimap_enabled="true"
+        zoomview:minimap_gravity="right"
+        zoomview:minimap_pos_x="@dimen/margin_m"
+        zoomview:minimap_size="@dimen/size_m">
 
         <ImageView
             android:id="@+id/ivImage"

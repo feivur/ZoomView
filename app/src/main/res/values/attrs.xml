@@ -12,6 +12,8 @@
         <attr name="minimap_caption" format="string" />
         <attr name="minimap_caption_color" format="color" />
         <attr name="minimap_caption_size" format="dimension" />
+        <attr name="min_zoom" format="float" />
+        <attr name="max_zoom" format="float" />
         <attr name="minimap_gravity">
             <flag name="right" value="0x01" />
             <flag name="bottom" value="0x02" />
