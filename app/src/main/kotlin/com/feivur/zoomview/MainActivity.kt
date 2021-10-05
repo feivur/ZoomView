@@ -1,4 +1,4 @@
-package com.axxonsoft.zoomview
+package com.feivur.zoomview
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle

@@ -6,7 +6,7 @@
     xmlns:zoomview="http://schemas.android.com/apk/res-auto"
     tools:context=".MainActivity">
 
-    <com.axxonsoft.zoomview.ZoomView
+    <com.feivur.zoomview.ZoomView
         android:id="@+id/zoomView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -19,8 +19,9 @@
         zoomview:minimap_color_thumb="?colorSurface"
         zoomview:minimap_enabled="true"
         zoomview:minimap_gravity="right"
-        zoomview:minimap_pos_x="@dimen/margin_m"
-        zoomview:minimap_size="@dimen/size_m">
+        zoomview:minimap_pos_x="8dp"
+        zoomview:minimap_pos_y="8dp"
+        zoomview:minimap_size="64dp">
 
         <ImageView
             android:id="@+id/ivImage"
@@ -32,6 +33,6 @@
             android:scaleType="fitCenter"
             android:src="@drawable/forest" />
 
-    </com.axxonsoft.zoomview.ZoomView>
+    </com.feivur.zoomview.ZoomView>
 
 </FrameLayout>

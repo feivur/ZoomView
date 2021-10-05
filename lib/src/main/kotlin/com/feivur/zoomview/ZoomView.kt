@@ -1,41 +1,57 @@
-package com.axxonsoft.zoomview
+package com.feivur.zoomview
 
 import android.animation.TypeEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
+import android.util.Log
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
-import timber.log.Timber
 
 /**
  * Zooming view
  * Created by Feivur on 05.10.2021.
  * inspired by https://github.com/Polidea/android-zoom-view
  */
-class ZoomView : FrameLayout {
 
-    // zooming
+class ZoomView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyleAttr: Int = 0
+) : FrameLayout(context, attrs, defStyleAttr) {
+
+    init {
+        init(context, attrs)
+    }
+
     var zoom = 1.0f
-        internal set
+        internal set(value) {
 
-    var maxZoom = 3.0f
+            if (field == minZoom && value > field)
+                listener?.onZoomStarted()
+
+            if (value == minZoom && field > value)
+                listener?.onZoomEnded()
+
+            field = value
+        }
+
     var minZoom = 1.0f
         set(value) {
             field = value.coerceAtLeast(1f)
         }
+    var maxZoom = 3.0f
 
-    private var zoomX = 0f
-    private var zoomY = 0f
+    var listener: ZoomViewListener? = null
 
-    // minimap variables
-    private var miniMapPosX = 10f
-    private var miniMapPosY = 10f
+
+    var miniMapPosX = 10f
+    var miniMapPosY = 10f
     private var isMiniMapEnabled = false
     private var miniMapColorThumb = Color.WHITE
     private var miniMapColorBackground = Color.BLACK
@@ -48,18 +64,15 @@ class ZoomView : FrameLayout {
     private var miniMapCaptionColor = Color.WHITE
     private var miniMapAlignRight = false
     private var miniMapAlignBottom = false
-    private var minimapCornerRadius = resources.getDimension(R.dimen.margin_s)
+    private var minimapCornerRadius = 16f
 
-    // drawing
+    private var zoomX = 0f
+    private var zoomY = 0f
     private val m = Matrix()
     private val paint = Paint()
-
-    var listener: ZoomViewListener? = null
-
-    fun contentSize() = PointF(getView().width.toFloat(), getView().height.toFloat())
-
     private val scaleDetector = ScaleGestureDetector(context, ScaleListener())
     private val gestureDetector = GestureDetector(context, GestureListener())
+    private val TAG = BuildConfig.LIBRARY_PACKAGE_NAME
 
     /**
      * Zooming view listener interface.
@@ -70,22 +83,8 @@ class ZoomView : FrameLayout {
         fun onZoomEnded()
     }
 
-    constructor(context: Context) : super(context) {}
-
-    constructor(context: Context, attrs: AttributeSet) : super(context, attrs) {
-        init(context, attrs)
-    }
-
-    constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(
-        context,
-        attrs,
-        defStyleAttr
-    ) {
-        init(context, attrs)
-    }
-
     private fun init(context: Context, attrs: AttributeSet?) {
-        Timber.i("init")
+        Log.i(TAG, "init")
         if (attrs != null) {
             val a = context.obtainStyledAttributes(attrs, R.styleable.zoomview)
             if (a.hasValue(R.styleable.zoomview_minimap_enabled))
@@ -257,20 +256,13 @@ class ZoomView : FrameLayout {
 
     //region VIEW
 
-    override fun setEnabled(enabled: Boolean) {
-        super.setEnabled(enabled)
-        if (!enabled)
-            zoom(minZoom, width / 2f, height / 2f)
-    }
 
-    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-
+    override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!isEnabled)
             return false
 
-        scaleDetector.onTouchEvent(event)
         gestureDetector.onTouchEvent(event)
-        return true
+        return scaleDetector.onTouchEvent(event)
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -294,6 +286,12 @@ class ZoomView : FrameLayout {
             drawMiniMap(canvas)
     }
 
+    override fun setEnabled(enabled: Boolean) {
+        super.setEnabled(enabled)
+        if (!enabled)
+            zoom(minZoom, width / 2f, height / 2f)
+    }
+
     //endregion VIEW
 
 
@@ -302,20 +300,20 @@ class ZoomView : FrameLayout {
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
 
         override fun onSingleTapConfirmed(me: MotionEvent): Boolean {
-            // Timber.i("onSingleTapConfirmed at ${me.x}x${me.y}")
+            // Log.i( TAG,"onSingleTapConfirmed at ${me.x}x${me.y}")
             callOnClick()
             return false
         }
 
         override fun onDoubleTap(me: MotionEvent): Boolean {
-            // Timber.i("onDoubleTap at ${me.x}x${me.y}")
+            // Log.i( TAG,"onDoubleTap at ${me.x}x${me.y}")
             val targetZoom = if (zoom == minZoom) 3f else minZoom
             zoom(targetZoom, me.x, me.y)
             return false
         }
 
         override fun onDoubleTapEvent(me: MotionEvent): Boolean {
-            //Timber.i("onDoubleTapEvent at ${me.x}x${me.y}")
+            //Log.i( TAG,"onDoubleTapEvent at ${me.x}x${me.y}")
             return false
         }
 
@@ -323,13 +321,13 @@ class ZoomView : FrameLayout {
             zoomX -= dx / zoom
             zoomY -= dy / zoom
             fitChildInParent()
-            // Timber.i("onScroll: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
+            // Log.i( TAG,"onScroll: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
             invalidate()
             return true
         }
 
         override fun onFling(me1: MotionEvent, me2: MotionEvent, vx: Float, vy: Float): Boolean {
-            // Timber.i("onFling at ${vx}|${vy}")
+            // Log.i( TAG,"onFling at ${vx}|${vy}")
             val dempfer = zoom * 10
             val start = PointF(zoomX, zoomY)
             val end = PointF(zoomX + vx / dempfer, zoomY + vy / dempfer)
@@ -339,12 +337,16 @@ class ZoomView : FrameLayout {
                 val current = it.animatedValue as PointF
                 zoomX = current.x
                 zoomY = current.y
-                //Timber.i("onFling: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
+                //Log.i( TAG,"onFling: zoomXY=${zoomX.toInt()}/${zoomY.toInt()}")
                 fitChildInParent()
                 invalidate()
             }
             animator.start()
             return false
+        }
+
+        override fun onDown(me: MotionEvent): Boolean {
+            return true
         }
     }
 
@@ -357,27 +359,15 @@ class ZoomView : FrameLayout {
             if (sgt.previousSpan != sgt.currentSpan)
                 listener?.onZooming(zoom, zoomX, zoomY)
 
-            //Timber.i("onScale zoom=$zoom, sfx=${(sfx * 100).toInt()}%, sfy=${(sfy * 100).toInt()}%")
+            //Log.i( TAG,"onScale zoom=$zoom, sfx=${(sfx * 100).toInt()}%, sfy=${(sfy * 100).toInt()}%")
             invalidate()
             return true
         }
-
-        override fun onScaleBegin(sgt: ScaleGestureDetector?): Boolean {
-            // Timber.i("onScaleBegin")
-            listener?.onZoomStarted()
-            return true
-        }
-
-        override fun onScaleEnd(sgt: ScaleGestureDetector?) {
-            // Timber.i("onScaleEnd")
-            listener?.onZoomEnded()
-        }
     }
-
 
     private class EvaluatorOfPointF : TypeEvaluator<PointF> {
         override fun evaluate(fraction: Float, p1: PointF, p2: PointF): PointF {
-            //Timber.i("interpolator fraction = $fraction")
+            //Log.i( TAG,"interpolator fraction = $fraction")
             return PointF(
                 p1.x + (p2.x - p1.x) * fraction,
                 p1.y + (p2.y - p1.y) * fraction
@@ -385,7 +375,5 @@ class ZoomView : FrameLayout {
         }
     }
 
-
     //endregion GESTURES
-
 }

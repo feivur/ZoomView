@@ -1,19 +1,21 @@
 plugins {
-    id 'com.android.application'
+    id 'com.android.library'
     id 'kotlin-android'
 }
 
 android {
-    compileSdk 30
+    compileSdk 31
 
     defaultConfig {
-        applicationId "com.feivur.zoomview"
         minSdk 21
-        targetSdk 30
+        targetSdk 31
         versionCode 1
         versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+
+        archivesBaseName = "${rootProject.name}-${versionName}"
     }
 
     buildTypes {
@@ -25,6 +27,4 @@ android {
 }
 
 dependencies {
-    implementation project(':lib')
-    implementation 'com.google.android.material:material:1.4.0'
 }
